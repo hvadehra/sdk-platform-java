@@ -2,6 +2,7 @@ package com.google.showcase.v1beta1.stub;
 
 import com.google.api.core.ApiFunction;
 import com.google.api.core.BetaApi;
+import com.google.api.core.ObsoleteApi;
 import com.google.api.gax.core.GaxProperties;
 import com.google.api.gax.core.GoogleCredentialsProvider;
 import com.google.api.gax.core.InstantiatingExecutorProvider;
@@ -137,6 +138,7 @@ public class ComplianceStubSettings extends StubSettings<ComplianceStubSettings>
   }
 
   /** Returns the default service endpoint. */
+  @ObsoleteApi
   public static String getDefaultEndpoint() {
     return "localhost:7469";
   }
@@ -302,7 +304,6 @@ public class ComplianceStubSettings extends StubSettings<ComplianceStubSettings>
       builder.setTransportChannelProvider(defaultTransportChannelProvider());
       builder.setCredentialsProvider(defaultCredentialsProviderBuilder().build());
       builder.setInternalHeaderProvider(defaultApiClientHeaderProviderBuilder().build());
-      builder.setEndpoint(getDefaultEndpoint());
       builder.setMtlsEndpoint(getDefaultMtlsEndpoint());
       builder.setSwitchToMtlsEndpointAllowed(true);
 
