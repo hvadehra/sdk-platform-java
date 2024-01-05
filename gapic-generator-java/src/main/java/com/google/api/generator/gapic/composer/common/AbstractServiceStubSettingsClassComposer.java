@@ -1189,7 +1189,13 @@ public abstract class AbstractServiceStubSettingsClassComposer implements ClassC
             .setReturnType(returnType)
             .setName("getDefaultEndpoint")
             .setReturnExpr(ValueExpr.withValue(StringObjectValue.withValue(service.defaultHost())))
-            .setAnnotations(ImmutableList.of(AnnotationNode.OBSOLETE_API))
+            .setAnnotations(
+                ImmutableList.of(
+                    AnnotationNode.builder()
+                        .setType(FIXED_TYPESTORE.get(ObsoleteApi.class.getSimpleName()))
+                        .setDescription(
+                            "See https://github.com/googleapis/sdk-platform-java/issues/2346 for more information")
+                        .build()))
             .build());
 
     // Create the getDefaultMtlsEndpoint method.

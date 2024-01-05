@@ -14,7 +14,6 @@
 
 package com.google.api.generator.engine.ast;
 
-import com.google.api.core.ObsoleteApi;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -28,8 +27,6 @@ public abstract class AnnotationNode implements AstNode {
       AnnotationNode.builder().setType(annotationType(Override.class)).build();
   public static AnnotationNode DEPRECATED =
       AnnotationNode.builder().setType(annotationType(Deprecated.class)).build();
-  public static AnnotationNode OBSOLETE_API =
-          AnnotationNode.builder().setType(annotationType(ObsoleteApi.class)).build();
 
   private static TypeNode annotationType(Class<?> clazz) {
     return TypeNode.withReference(ConcreteReference.withClazz(clazz));
