@@ -22,6 +22,7 @@ import io
 import contextlib
 from pathlib import Path
 from difflib import unified_diff
+
 from typing import List
 from parameterized import parameterized
 from library_generation import utilities as util
@@ -30,6 +31,8 @@ from library_generation.model.generation_config import GenerationConfig
 from library_generation.model.gapic_inputs import parse as parse_build_file
 from library_generation.model.generation_config import from_yaml
 from library_generation.model.library_config import LibraryConfig
+from library_generation.utilities import find_versioned_proto_path
+from library_generation.utilities import get_file_paths
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 resources_dir = os.path.join(script_dir, "resources")
@@ -50,6 +53,14 @@ library_2 = LibraryConfig(
     name_pretty="Secret Management",
     product_documentation="https://cloud.google.com/solutions/secrets-management/",
     api_description="allows you to encrypt, store, manage, and audit infrastructure and application-level secrets.",
+    gapic_configs=list(),
+)
+library_3 = LibraryConfig(
+    api_shortname="secret",
+    name_pretty="Secret Management Example",
+    product_documentation="https://cloud.google.com/solutions/",
+    api_description="allows you to encrypt, store, and audit infrastructure and application-level secrets.",
+    library_name="secretmanager",
     gapic_configs=list(),
 )
 
@@ -206,6 +217,58 @@ class UtilitiesTest(unittest.TestCase):
         self.assertEqual("google/cloud/asset/v1p5beta1", gapics[3].proto_path)
         self.assertEqual("google/cloud/asset/v1p7beta1", gapics[4].proto_path)
 
+    def test_get_file_paths_from_yaml_success(self):
+        paths = get_file_paths(from_yaml(f"{test_config_dir}/generation_config.yaml"))
+        self.assertEqual(
+            {
+                "google/cloud/asset/v1": "asset",
+                "google/cloud/asset/v1p1beta1": "asset",
+                "google/cloud/asset/v1p2beta1": "asset",
+                "google/cloud/asset/v1p5beta1": "asset",
+                "google/cloud/asset/v1p7beta1": "asset",
+            },
+            paths,
+        )
+
+    @parameterized.expand(
+        [
+            (
+                "google/cloud/aiplatform/v1/schema/predict/params/image_classification.proto",
+                "google/cloud/aiplatform/v1",
+            ),
+            (
+                "google/cloud/asset/v1p2beta1/assets.proto",
+                "google/cloud/asset/v1p2beta1",
+            ),
+            ("google/type/color.proto", "google/type/color.proto"),
+        ]
+    )
+    def test_find_versioned_proto_path(self, file_path, expected):
+        proto_path = find_versioned_proto_path(file_path)
+        self.assertEqual(expected, proto_path)
+
+    @parameterized.expand(
+        [
+            ("BUILD_no_additional_protos.bazel", " "),
+            ("BUILD_common_resources.bazel", "  google/cloud/common_resources.proto"),
+            ("BUILD_comment_common_resources.bazel", " "),
+            ("BUILD_locations.bazel", "  google/cloud/location/locations.proto"),
+            ("BUILD_comment_locations.bazel", " "),
+            ("BUILD_iam_policy.bazel", "  google/iam/v1/iam_policy.proto"),
+            ("BUILD_comment_iam_policy.bazel", " "),
+            (
+                "BUILD_iam_locations.bazel",
+                "  google/cloud/location/locations.proto google/iam/v1/iam_policy.proto",
+            ),
+        ]
+    )
+    def test_gapic_inputs_parse_additional_protos(self, build_name, expected):
+        parsed = parse_build_file(build_file, "", build_name)
+        self.assertEqual(
+            expected,
+            parsed.additional_protos,
+        )
+
     def test_gapic_inputs_parse_grpc_only_succeeds(self):
         parsed = parse_build_file(build_file, "", "BUILD_grpc.bazel")
         self.assertEqual("grpc", parsed.transport)
@@ -346,31 +409,35 @@ class UtilitiesTest(unittest.TestCase):
     def test_get_library_returns_api_shortname(self):
         self.assertEqual("secretmanager", util.get_library_name(library_2))
 
-    def test_generate_prerequisite_files_success(self):
-        library_path = f"{resources_dir}/goldens"
-        files = [
-            f"{library_path}/.repo-metadata.json",
-            f"{library_path}/.OwlBot.yaml",
-            f"{library_path}/owlbot.py",
-        ]
-        self.__cleanup(files)
-        config = self.__get_a_gen_config(1)
-        proto_path = "google/cloud/baremetalsolution/v2"
-        transport = "grpc"
-        util.generate_prerequisite_files(
-            config=config,
-            library=library_1,
-            proto_path=proto_path,
-            transport=transport,
-            library_path=library_path,
+    def test_generate_prerequisite_files_non_monorepo_success(self):
+        library_path = self.__setup_prerequisite_files(
+            num_libraries=1, library_type="GAPIC_COMBO"
         )
 
         self.__compare_files(
             f"{library_path}/.repo-metadata.json",
-            f"{library_path}/.repo-metadata-golden.json",
+            f"{library_path}/.repo-metadata-non-monorepo-golden.json",
+        )
+        # since this is a single library, we treat this as HW repository,
+        # meaning that the owlbot yaml will be inside a .github folder
+        self.__compare_files(
+            f"{library_path}/.github/.OwlBot.yaml",
+            f"{library_path}/.OwlBot-golden.yaml",
         )
         self.__compare_files(
-            f"{library_path}/.OwlBot.yaml", f"{library_path}/.OwlBot-golden.yaml"
+            f"{library_path}/owlbot.py", f"{library_path}/owlbot-golden.py"
+        )
+
+    def test_generate_prerequisite_files_monorepo_success(self):
+        library_path = self.__setup_prerequisite_files(num_libraries=2)
+
+        self.__compare_files(
+            f"{library_path}/.repo-metadata.json",
+            f"{library_path}/.repo-metadata-monorepo-golden.json",
+        )
+        self.__compare_files(
+            f"{library_path}/.OwlBot.yaml",
+            f"{library_path}/.OwlBot-golden.yaml",
         )
         self.__compare_files(
             f"{library_path}/owlbot.py", f"{library_path}/owlbot-golden.py"
@@ -387,6 +454,17 @@ class UtilitiesTest(unittest.TestCase):
         library_path = sorted([Path(key).name for key in repo_config.libraries])
         self.assertEqual(
             ["java-bare-metal-solution", "java-secretmanager"], library_path
+        )
+
+    def test_prepare_repo_monorepo_duplicated_library_name_failed(self):
+        gen_config = self.__get_a_gen_config(3)
+        self.assertRaisesRegex(
+            ValueError,
+            "secretmanager",
+            util.prepare_repo,
+            gen_config,
+            gen_config.libraries,
+            f"{resources_dir}/misc",
         )
 
     def test_prepare_repo_monorepo_failed(self):
@@ -410,15 +488,15 @@ class UtilitiesTest(unittest.TestCase):
         library_path = sorted([Path(key).name for key in repo_config.libraries])
         self.assertEqual(["misc"], library_path)
 
-    def test_repo_level_post_process_success(self):
-        repository_path = f"{resources_dir}/test_repo_level_postprocess"
+    def test_monorepo_postprocessing_valid_repository_success(self):
+        repository_path = f"{resources_dir}/test_monorepo_postprocessing"
         versions_file = f"{repository_path}/versions.txt"
         files = [
             f"{repository_path}/pom.xml",
             f"{repository_path}/gapic-libraries-bom/pom.xml",
         ]
         self.__cleanup(files)
-        util.repo_level_post_process(
+        util.monorepo_postprocessing(
             repository_path=repository_path, versions_file=versions_file
         )
         self.__compare_files(
@@ -441,20 +519,57 @@ class UtilitiesTest(unittest.TestCase):
             first=[], second=diff, msg="Unexpected file contents:\n" + "".join(diff)
         )
 
+    def __setup_prerequisite_files(
+        self, num_libraries: int, library_type: str = "GAPIC_AUTO"
+    ) -> str:
+        library_path = f"{resources_dir}/goldens"
+        files = [
+            f"{library_path}/.repo-metadata.json",
+            f"{library_path}/.OwlBot.yaml",
+            f"{library_path}/owlbot.py",
+        ]
+        self.__cleanup(files)
+        config = self.__get_a_gen_config(num_libraries, library_type=library_type)
+        proto_path = "google/cloud/baremetalsolution/v2"
+        transport = "grpc"
+        util.generate_prerequisite_files(
+            config=config,
+            library=library_1,
+            proto_path=proto_path,
+            transport=transport,
+            library_path=library_path,
+        )
+        return library_path
+
     @staticmethod
-    def __get_a_gen_config(num: int):
+    def __get_a_gen_config(
+        num_libraries: int, library_type: str = "GAPIC_AUTO"
+    ) -> GenerationConfig:
         """
-        Returns an object of GenerationConfig with one or two of
+        Returns an object of GenerationConfig with one to three of
         LibraryConfig objects. Other attributes are set to empty str.
 
-        :param num: the number of LibraryConfig objects associated with
-        the GenerationConfig. Only support one or two.
+        :param num_libraries: the number of LibraryConfig objects associated with
+        the GenerationConfig. Only support 1, 2 or 3.
         :return: an object of GenerationConfig
         """
-        if num > 1:
+        if num_libraries == 2:
             libraries = [library_1, library_2]
+        elif num_libraries == 3:
+            libraries = [library_1, library_2, library_3]
         else:
             libraries = [library_1]
+
+        # update libraries with custom configuration (for now, only
+        # library_type)
+        for library in libraries:
+            library.library_type = library_type
+            if num_libraries == 1:
+                # treat this as a HW library case to generate a real-life
+                # repo-metadata
+                library.extra_versioned_modules = "test-module"
+            else:
+                library.extra_versioned_modules = None
 
         return GenerationConfig(
             gapic_generator_version="",
