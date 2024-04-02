@@ -370,10 +370,7 @@ public final class InstantiatingGrpcChannelProvider implements TransportChannelP
 
     // Check DirectPath traffic.
     boolean useDirectPathXds = false;
-    if (isDirectPathEnabled()
-        && isCredentialDirectPathCompatible()
-        && isOnComputeEngine()
-        && canUseDirectPathWithUniverseDomain()) {
+    if (canUseDirectPath()) {
       CallCredentials callCreds = MoreCallCredentials.from(credentials);
       ChannelCredentials channelCreds =
           GoogleDefaultChannelCredentials.newBuilder().callCredentials(callCreds).build();
@@ -444,6 +441,24 @@ public final class InstantiatingGrpcChannelProvider implements TransportChannelP
       channelPrimer.primeChannel(managedChannel);
     }
     return managedChannel;
+  }
+
+  /**
+   * Marked as Internal Api and intended for internal use. DirectPath must be enabled via the
+   * settings and a few other configurations/settings must also be valid for the request to go
+   * through DirectPath.
+   *
+   * <p>Checks: 1. Credentials are compatible 2.Running on Compute Engine 3. Universe Domain is
+   * configured to for the Google Default Universe
+   *
+   * @return if DirectPath is enabled for the client AND if the configurations are valid
+   */
+  @InternalApi
+  public boolean canUseDirectPath() {
+    return isDirectPathEnabled()
+        && isCredentialDirectPathCompatible()
+        && isOnComputeEngine()
+        && canUseDirectPathWithUniverseDomain();
   }
 
   /** The endpoint to be used for the channel. */

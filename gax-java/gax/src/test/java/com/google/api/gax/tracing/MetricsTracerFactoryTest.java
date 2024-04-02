@@ -33,12 +33,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.api.gax.tracing.ApiTracerFactory.OperationType;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.truth.Truth;
+import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 
 public class MetricsTracerFactoryTest {
+  private static final int DEFAULT_ATTRIBUTES_COUNT = 2;
   @Mock private MetricsRecorder metricsRecorder;
   @Mock private ApiTracer parent;
   private SpanName spanName;
@@ -56,26 +59,39 @@ public class MetricsTracerFactoryTest {
 
   @Test
   public void testNewTracer_notNull() {
-    // Call the newTracer method
     ApiTracer apiTracer = metricsTracerFactory.newTracer(parent, spanName, OperationType.Unary);
 
     // Assert that the apiTracer created has expected type and not null
-    Truth.assertThat(apiTracer).isInstanceOf(MetricsTracer.class);
     Truth.assertThat(apiTracer).isNotNull();
+    Truth.assertThat(apiTracer).isInstanceOf(MetricsTracer.class);
   }
 
   @Test
-  public void testNewTracer_HasCorrectParameters() {
-
-    // Call the newTracer method
-    ApiTracer apiTracer = metricsTracerFactory.newTracer(parent, spanName, OperationType.Unary);
-
-    // Assert that the apiTracer created has expected type and not null
-    Truth.assertThat(apiTracer).isInstanceOf(MetricsTracer.class);
-    Truth.assertThat(apiTracer).isNotNull();
-
-    MetricsTracer metricsTracer = (MetricsTracer) apiTracer;
-    Truth.assertThat(metricsTracer.getAttributes().get("method_name"))
+  public void testNewTracer_hasCorrectNumberAttributes_hasDefaultAttributes() {
+    MetricsTracer metricsTracer =
+        (MetricsTracer) metricsTracerFactory.newTracer(parent, spanName, OperationType.Unary);
+    Map<String, String> attributes = metricsTracer.getAttributes();
+    Truth.assertThat(attributes.size()).isEqualTo(DEFAULT_ATTRIBUTES_COUNT);
+    Truth.assertThat(attributes.get(MetricsTracer.METHOD_NAME_ATTRIBUTE))
         .isEqualTo("testService.testMethod");
+    Truth.assertThat(attributes.get(MetricsTracer.LANGUAGE_ATTRIBUTE))
+        .isEqualTo(MetricsTracer.DEFAULT_LANGUAGE);
+  }
+
+  @Test
+  public void testClientAttributes_additionalClientAttributes() {
+    Map<String, String> clientAttributes =
+        ImmutableMap.of("attribute1", "value1", "attribute2", "value2");
+    MetricsTracerFactory metricsTracerFactory =
+        new MetricsTracerFactory(metricsRecorder, clientAttributes);
+
+    MetricsTracer metricsTracer =
+        (MetricsTracer) metricsTracerFactory.newTracer(parent, spanName, OperationType.Unary);
+    Map<String, String> attributes = metricsTracer.getAttributes();
+    Truth.assertThat(attributes.size())
+        .isEqualTo(DEFAULT_ATTRIBUTES_COUNT + clientAttributes.size());
+    // Default attributes already tested above
+    Truth.assertThat(attributes.containsKey("attribute1")).isTrue();
+    Truth.assertThat(attributes.containsKey("attribute2")).isTrue();
   }
 }
