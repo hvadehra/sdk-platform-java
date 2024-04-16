@@ -84,11 +84,21 @@ import org.threeten.bp.Duration;
  */
 @InternalExtensionOnly
 public final class InstantiatingGrpcChannelProvider implements TransportChannelProvider {
+
+  // Package-Private class used to read a file for the Produce Name on Compute Engine. Wrapped
+  // class which allows unit tests to override for testing purposes.
+  static class SystemProductNameReader {
+    @VisibleForTesting
+    String getSystemProductName() throws IOException {
+      return Files.asCharSource(new File("/sys/class/dmi/id/product_name"), StandardCharsets.UTF_8)
+          .readFirstLine();
+    }
+  }
+
   @VisibleForTesting
   static final Logger LOG = Logger.getLogger(InstantiatingGrpcChannelProvider.class.getName());
 
-  private static final String DIRECT_PATH_ENV_DISABLE_DIRECT_PATH =
-      "GOOGLE_CLOUD_DISABLE_DIRECT_PATH";
+  static final String DIRECT_PATH_ENV_DISABLE_DIRECT_PATH = "GOOGLE_CLOUD_DISABLE_DIRECT_PATH";
   private static final String DIRECT_PATH_ENV_ENABLE_XDS = "GOOGLE_CLOUD_ENABLE_DIRECT_PATH_XDS";
   static final long DIRECT_PATH_KEEP_ALIVE_TIME_SECONDS = 3600;
   static final long DIRECT_PATH_KEEP_ALIVE_TIMEOUT_SECONDS = 20;
@@ -117,6 +127,7 @@ public final class InstantiatingGrpcChannelProvider implements TransportChannelP
   @Nullable private final Boolean allowNonDefaultServiceAccount;
   @VisibleForTesting final ImmutableMap<String, ?> directPathServiceConfig;
   @Nullable private final MtlsProvider mtlsProvider;
+  private final SystemProductNameReader systemProductNameReader;
 
   @Nullable
   private final ApiFunction<ManagedChannelBuilder, ManagedChannelBuilder> channelConfigurator;
@@ -145,6 +156,7 @@ public final class InstantiatingGrpcChannelProvider implements TransportChannelP
         builder.directPathServiceConfig == null
             ? getDefaultDirectPathServiceConfig()
             : builder.directPathServiceConfig;
+    this.systemProductNameReader = builder.systemProductNameReader;
   }
 
   /**
@@ -317,13 +329,11 @@ public final class InstantiatingGrpcChannelProvider implements TransportChannelP
   // DirectPath should only be used on Compute Engine.
   // Notice Windows is supported for now.
   @VisibleForTesting
-  static boolean isOnComputeEngine() {
+  boolean isOnComputeEngine() {
     String osName = System.getProperty("os.name");
     if ("Linux".equals(osName)) {
       try {
-        String result =
-            Files.asCharSource(new File("/sys/class/dmi/id/product_name"), StandardCharsets.UTF_8)
-                .readFirstLine();
+        String result = systemProductNameReader.getSystemProductName();
         return result.contains(GCE_PRODUCTION_NAME_PRIOR_2016)
             || result.contains(GCE_PRODUCTION_NAME_AFTER_2016);
       } catch (IOException ignored) {
@@ -528,6 +538,7 @@ public final class InstantiatingGrpcChannelProvider implements TransportChannelP
     @Nullable private Boolean attemptDirectPathXds;
     @Nullable private Boolean allowNonDefaultServiceAccount;
     @Nullable private ImmutableMap<String, ?> directPathServiceConfig;
+    private SystemProductNameReader systemProductNameReader = new SystemProductNameReader();
 
     private Builder() {
       processorCount = Runtime.getRuntime().availableProcessors();
@@ -556,6 +567,7 @@ public final class InstantiatingGrpcChannelProvider implements TransportChannelP
       this.allowNonDefaultServiceAccount = provider.allowNonDefaultServiceAccount;
       this.directPathServiceConfig = provider.directPathServiceConfig;
       this.mtlsProvider = provider.mtlsProvider;
+      this.systemProductNameReader = provider.systemProductNameReader;
     }
 
     /**
@@ -765,6 +777,18 @@ public final class InstantiatingGrpcChannelProvider implements TransportChannelP
     @InternalApi("For internal use by google-cloud-java clients only")
     public Builder setAttemptDirectPathXds() {
       this.attemptDirectPathXds = true;
+      return this;
+    }
+
+    @VisibleForTesting
+    Builder setEnvProvider(EnvironmentProvider envProvider) {
+      this.envProvider = envProvider;
+      return this;
+    }
+
+    @VisibleForTesting
+    Builder setSystemProductNameReader(SystemProductNameReader systemProductNameReader) {
+      this.systemProductNameReader = systemProductNameReader;
       return this;
     }
 
