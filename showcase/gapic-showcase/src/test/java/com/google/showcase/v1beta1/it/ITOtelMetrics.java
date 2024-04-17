@@ -30,7 +30,6 @@
 
 package com.google.showcase.v1beta1.it;
 
-import static com.google.showcase.v1beta1.it.util.TestClientInitializer.DEFAULT_GRPC_ENDPOINT;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.http.javanet.NetHttpTransport;
@@ -796,8 +795,8 @@ public class ITOtelMetrics {
             .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
             .build();
 
-    Map<String, String> customAttributes = new HashMap<>();
-    customAttributes.put("directpath_enabled", String.valueOf(channelProvider.canUseDirectPath()));
+    Map<String, Object> customAttributes = new HashMap<>();
+    customAttributes.put("directpath_enabled", channelProvider.canUseDirectPath());
     customAttributes.put("testing", "showcase");
 
     InMemoryMetricReader inMemoryMetricReader = InMemoryMetricReader.create();
@@ -810,7 +809,7 @@ public class ITOtelMetrics {
         EchoSettings.newBuilder()
             .setCredentialsProvider(NoCredentialsProvider.create())
             .setTransportChannelProvider(channelProvider)
-            .setEndpoint(DEFAULT_GRPC_ENDPOINT)
+            .setEndpoint(TestClientInitializer.DEFAULT_GRPC_ENDPOINT)
             .build();
 
     EchoStubSettings echoStubSettings =

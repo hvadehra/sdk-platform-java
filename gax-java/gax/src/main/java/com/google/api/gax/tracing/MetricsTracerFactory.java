@@ -48,7 +48,7 @@ public class MetricsTracerFactory implements ApiTracerFactory {
   protected MetricsRecorder metricsRecorder;
 
   // These are client attributes and pertain every single trace
-  private final Map<String, String> attributes;
+  private final Map<String, Object> attributes;
 
   /** Creates a MetricsTracerFactory with no additional client level attributes. */
   public MetricsTracerFactory(MetricsRecorder metricsRecorder) {
@@ -59,7 +59,7 @@ public class MetricsTracerFactory implements ApiTracerFactory {
    * Pass in a Map of client level attributes which will be added to every single MetricsTracer
    * created from the ApiTracerFactory.
    */
-  public MetricsTracerFactory(MetricsRecorder metricsRecorder, Map<String, String> attributes) {
+  public MetricsTracerFactory(MetricsRecorder metricsRecorder, Map<String, Object> attributes) {
     this.metricsRecorder = metricsRecorder;
     this.attributes = attributes;
   }
@@ -69,8 +69,8 @@ public class MetricsTracerFactory implements ApiTracerFactory {
     MetricsTracer metricsTracer =
         new MetricsTracer(
             MethodName.of(spanName.getClientName(), spanName.getMethodName()), metricsRecorder);
-    for (Map.Entry<String, String> attributeEntrySet : attributes.entrySet()) {
-      metricsTracer.addAttributes(attributeEntrySet.getKey(), attributeEntrySet.getValue());
+    for (Map.Entry<String, Object> attributeEntrySet : attributes.entrySet()) {
+      metricsTracer.addAttributes(attributeEntrySet.getKey(), String.valueOf(attributeEntrySet.getValue()));
     }
     return metricsTracer;
   }

@@ -80,7 +80,7 @@ public class MetricsTracerFactoryTest {
 
   @Test
   public void testClientAttributes_additionalClientAttributes() {
-    Map<String, String> clientAttributes =
+    Map<String, Object> clientAttributes =
         ImmutableMap.of("attribute1", "value1", "attribute2", "value2");
     MetricsTracerFactory metricsTracerFactory =
         new MetricsTracerFactory(metricsRecorder, clientAttributes);
