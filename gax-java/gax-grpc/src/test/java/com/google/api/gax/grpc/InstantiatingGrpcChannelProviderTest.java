@@ -29,7 +29,6 @@
  */
 package com.google.api.gax.grpc;
 
-import static com.google.api.gax.grpc.InstantiatingGrpcChannelProvider.GCE_PRODUCTION_NAME_AFTER_2016;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertEquals;
@@ -37,6 +36,7 @@ import static org.junit.Assert.assertEquals;
 import com.google.api.core.ApiFunction;
 import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider.Builder;
 import com.google.api.gax.rpc.HeaderProvider;
+import com.google.api.gax.rpc.TransportChannel;
 import com.google.api.gax.rpc.TransportChannelProvider;
 import com.google.api.gax.rpc.internal.EnvironmentProvider;
 import com.google.api.gax.rpc.mtls.AbstractMtlsTransportChannelTest;
@@ -60,6 +60,7 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.stream.Collectors;
@@ -95,7 +96,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
     systemProductNameReader =
         Mockito.mock(InstantiatingGrpcChannelProvider.SystemProductNameReader.class);
     Mockito.when(systemProductNameReader.getSystemProductName())
-        .thenReturn(GCE_PRODUCTION_NAME_AFTER_2016);
+        .thenReturn(InstantiatingGrpcChannelProvider.GCE_PRODUCTION_NAME_AFTER_2016);
   }
 
   @After
@@ -586,13 +587,16 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
             .setEndpoint("localhost:8080")
             .build();
 
-    provider.getTransportChannel();
+    TransportChannel transportChannel = provider.getTransportChannel();
 
     assertThat(logHandler.getAllMessages())
         .contains(
             "DirectPath is misconfigured. Please set the attemptDirectPath option along with the"
                 + " attemptDirectPathXds option.");
     InstantiatingGrpcChannelProvider.LOG.removeHandler(logHandler);
+
+    transportChannel.close();
+    transportChannel.awaitTermination(10, TimeUnit.SECONDS);
   }
 
   @Test
@@ -621,13 +625,16 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
             .setEndpoint("test.googleapis.com:443")
             .build();
 
-    provider.getTransportChannel();
+    TransportChannel transportChannel = provider.getTransportChannel();
 
     assertThat(logHandler.getAllMessages())
         .contains(
             "DirectPath is misconfigured. Please make sure the credential is an instance of"
                 + " com.google.auth.oauth2.ComputeEngineCredentials .");
     InstantiatingGrpcChannelProvider.LOG.removeHandler(logHandler);
+
+    transportChannel.close();
+    transportChannel.awaitTermination(10, TimeUnit.SECONDS);
   }
 
   @Test
@@ -644,7 +651,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
             .setEndpoint("test.googleapis.com:443")
             .build();
 
-    provider.getTransportChannel();
+    TransportChannel transportChannel = provider.getTransportChannel();
 
     if (!provider.isOnComputeEngine()) {
       assertThat(logHandler.getAllMessages())
@@ -652,6 +659,9 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
               "DirectPath is misconfigured. DirectPath is only available in a GCE environment.");
     }
     InstantiatingGrpcChannelProvider.LOG.removeHandler(logHandler);
+
+    transportChannel.close();
+    transportChannel.awaitTermination(10, TimeUnit.SECONDS);
   }
 
   @Test
@@ -678,6 +688,42 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
         InstantiatingGrpcChannelProvider.newBuilder()
             .setEnvProvider(envProvider)
             .setAttemptDirectPath(true)
+            .setCredentials(computeEngineCredentials)
+            .setSystemProductNameReader(systemProductNameReader)
+            .setEndpoint("test.googleapis.com:443")
+            .build();
+    Truth.assertThat(provider.canUseDirectPath()).isFalse();
+  }
+
+  @Test
+  public void canUseDirectPath_directPathEnvVarNotSet_attemptDirectPathIsTrue() {
+    EnvironmentProvider envProvider = Mockito.mock(EnvironmentProvider.class);
+    Mockito.when(
+            envProvider.getenv(
+                InstantiatingGrpcChannelProvider.DIRECT_PATH_ENV_DISABLE_DIRECT_PATH))
+        .thenReturn(null);
+    InstantiatingGrpcChannelProvider provider =
+        InstantiatingGrpcChannelProvider.newBuilder()
+            .setEnvProvider(envProvider)
+            .setAttemptDirectPath(true)
+            .setCredentials(computeEngineCredentials)
+            .setSystemProductNameReader(systemProductNameReader)
+            .setEndpoint("test.googleapis.com:443")
+            .build();
+    Truth.assertThat(provider.canUseDirectPath()).isTrue();
+  }
+
+  @Test
+  public void canUseDirectPath_directPathEnvVarNotSet_attemptDirectPathIsFalse() {
+    EnvironmentProvider envProvider = Mockito.mock(EnvironmentProvider.class);
+    Mockito.when(
+            envProvider.getenv(
+                InstantiatingGrpcChannelProvider.DIRECT_PATH_ENV_DISABLE_DIRECT_PATH))
+        .thenReturn(null);
+    InstantiatingGrpcChannelProvider provider =
+        InstantiatingGrpcChannelProvider.newBuilder()
+            .setEnvProvider(envProvider)
+            .setAttemptDirectPath(false)
             .setCredentials(computeEngineCredentials)
             .setSystemProductNameReader(systemProductNameReader)
             .setEndpoint("test.googleapis.com:443")

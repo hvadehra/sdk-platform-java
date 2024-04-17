@@ -85,10 +85,9 @@ import org.threeten.bp.Duration;
 @InternalExtensionOnly
 public final class InstantiatingGrpcChannelProvider implements TransportChannelProvider {
 
-  // Package-Private class used to read a file for the Produce Name on Compute Engine. Wrapped
-  // class which allows unit tests to override for testing purposes.
+  // Package-Private class used to read a file for the Product Name on Compute Engine.
+  @VisibleForTesting
   static class SystemProductNameReader {
-    @VisibleForTesting
     String getSystemProductName() throws IOException {
       return Files.asCharSource(new File("/sys/class/dmi/id/product_name"), StandardCharsets.UTF_8)
           .readFirstLine();
