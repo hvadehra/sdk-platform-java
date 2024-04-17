@@ -30,11 +30,13 @@
 
 package com.google.showcase.v1beta1.it;
 
+import static com.google.showcase.v1beta1.it.util.TestClientInitializer.DEFAULT_GRPC_ENDPOINT;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.core.ApiFuture;
 import com.google.api.gax.core.NoCredentialsProvider;
+import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
 import com.google.api.gax.retrying.RetrySettings;
 import com.google.api.gax.rpc.InvalidArgumentException;
 import com.google.api.gax.rpc.StatusCode.Code;
@@ -68,8 +70,12 @@ import io.opentelemetry.sdk.metrics.data.HistogramPointData;
 import io.opentelemetry.sdk.metrics.data.LongPointData;
 import io.opentelemetry.sdk.metrics.data.MetricData;
 import io.opentelemetry.sdk.metrics.data.PointData;
+import io.opentelemetry.sdk.metrics.export.MetricReader;
 import io.opentelemetry.sdk.testing.exporter.InMemoryMetricReader;
+
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -100,7 +106,7 @@ public class ITOtelMetrics {
   private static final String OPERATION_COUNT = SERVICE_NAME + "/operation_count";
   private static final String ATTEMPT_LATENCY = SERVICE_NAME + "/attempt_latency";
   private static final String OPERATION_LATENCY = SERVICE_NAME + "/operation_latency";
-  private static final int NUM_METRICS = 4;
+  private static final int NUM_DEFAULT_METRICS = 4;
   private static final int NUM_COLLECTION_FLUSH_ATTEMPTS = 10;
   private InMemoryMetricReader inMemoryMetricReader;
   private EchoClient grpcClient;
@@ -273,15 +279,22 @@ public class ITOtelMetrics {
   }
 
   /**
-   * Attempts to retrieve the metrics from the InMemoryMetricsReader. Sleep every second for at most
+   * Uses the default InMemoryMetricReader configured for showcase tests.
+   */
+  private List<MetricData> getMetricDataList() throws InterruptedException {
+    return getMetricDataList(inMemoryMetricReader);
+  }
+
+  /**
+   * Attempts to retrieve the metrics from a custom InMemoryMetricsReader. Sleep every second for at most
    * 10s to try and retrieve all the metrics available. If it is unable to retrieve all the metrics,
    * fail the test.
    */
-  private List<MetricData> getMetricDataList() throws InterruptedException {
+  private List<MetricData> getMetricDataList(InMemoryMetricReader metricReader) throws InterruptedException {
     for (int i = 0; i < NUM_COLLECTION_FLUSH_ATTEMPTS; i++) {
       Thread.sleep(1000L);
-      List<MetricData> metricData = new ArrayList<>(inMemoryMetricReader.collectAllMetrics());
-      if (metricData.size() == NUM_METRICS) {
+      List<MetricData> metricData = new ArrayList<>(metricReader.collectAllMetrics());
+      if (metricData.size() == NUM_DEFAULT_METRICS) {
         return metricData;
       }
     }
@@ -777,5 +790,55 @@ public class ITOtelMetrics {
 
     httpClient.close();
     httpClient.awaitTermination(TestClientInitializer.AWAIT_TERMINATION_SECONDS, TimeUnit.SECONDS);
+  }
+
+  @Test
+  public void recordsCustomAttributes() throws InterruptedException, IOException {
+    InstantiatingGrpcChannelProvider channelProvider = EchoSettings.defaultGrpcTransportProviderBuilder()
+            .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
+            .build();
+
+    Map<String, String> customAttributes = new HashMap<>();
+    customAttributes.put("directpath_enabled", String.valueOf(channelProvider.canUseDirectPath()));
+    customAttributes.put("testing", "showcase");
+
+    InMemoryMetricReader inMemoryMetricReader = InMemoryMetricReader.create();
+    OpenTelemetryMetricsRecorder otelMetricsRecorder = createOtelMetricsRecorder(inMemoryMetricReader);
+    MetricsTracerFactory metricsTracerFactory = new MetricsTracerFactory(otelMetricsRecorder, customAttributes);
+
+    EchoSettings grpcEchoSettings =
+            EchoSettings.newBuilder()
+                    .setCredentialsProvider(NoCredentialsProvider.create())
+                    .setTransportChannelProvider(channelProvider)
+                    .setEndpoint(DEFAULT_GRPC_ENDPOINT)
+                    .build();
+
+    EchoStubSettings echoStubSettings =
+            (EchoStubSettings)
+                    grpcEchoSettings
+                            .getStubSettings()
+                            .toBuilder()
+                            .setTracerFactory(metricsTracerFactory)
+                            .build();
+    EchoStub stub = echoStubSettings.createStub();
+    EchoClient grpcClient =  EchoClient.create(stub);
+
+    EchoRequest echoRequest = EchoRequest.newBuilder().setContent("content").build();
+    grpcClient.echo(echoRequest);
+
+    List<MetricData> metricDataList = getMetricDataList(inMemoryMetricReader);
+    Map<String, String> attributeMapping =
+            ImmutableMap.of(
+                    MetricsTracer.METHOD_NAME_ATTRIBUTE,
+                    "Echo.Echo",
+                    MetricsTracer.LANGUAGE_ATTRIBUTE,
+                    MetricsTracer.DEFAULT_LANGUAGE,
+                    "directpath_enabled",
+                    "false",
+                    "testing",
+                    "showcase");
+    verifyDefaultMetricsAttributes(metricDataList, attributeMapping);
+
+    inMemoryMetricReader.close();
   }
 }
