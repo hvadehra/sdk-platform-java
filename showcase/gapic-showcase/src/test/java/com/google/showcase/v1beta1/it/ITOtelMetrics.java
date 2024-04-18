@@ -795,6 +795,7 @@ public class ITOtelMetrics {
             .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
             .build();
 
+    // Add custom attributes to be added as client level attributes
     Map<String, Object> customAttributes = new HashMap<>();
     customAttributes.put("directpath_enabled", channelProvider.canUseDirectPath());
     customAttributes.put("testing", "showcase");

@@ -70,7 +70,8 @@ public class MetricsTracerFactory implements ApiTracerFactory {
         new MetricsTracer(
             MethodName.of(spanName.getClientName(), spanName.getMethodName()), metricsRecorder);
     for (Map.Entry<String, Object> attributeEntrySet : attributes.entrySet()) {
-      metricsTracer.addAttributes(attributeEntrySet.getKey(), String.valueOf(attributeEntrySet.getValue()));
+      metricsTracer.addAttributes(
+          attributeEntrySet.getKey(), String.valueOf(attributeEntrySet.getValue()));
     }
     return metricsTracer;
   }

@@ -537,12 +537,13 @@ public final class InstantiatingGrpcChannelProvider implements TransportChannelP
     @Nullable private Boolean attemptDirectPathXds;
     @Nullable private Boolean allowNonDefaultServiceAccount;
     @Nullable private ImmutableMap<String, ?> directPathServiceConfig;
-    private SystemProductNameReader systemProductNameReader = new SystemProductNameReader();
+    private SystemProductNameReader systemProductNameReader;
 
     private Builder() {
       processorCount = Runtime.getRuntime().availableProcessors();
       envProvider = System::getenv;
       channelPoolSettings = ChannelPoolSettings.staticallySized(1);
+      systemProductNameReader = new SystemProductNameReader();
     }
 
     private Builder(InstantiatingGrpcChannelProvider provider) {

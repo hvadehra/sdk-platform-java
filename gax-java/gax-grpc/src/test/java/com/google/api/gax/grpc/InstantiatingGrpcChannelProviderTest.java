@@ -76,6 +76,7 @@ import org.threeten.bp.Duration;
 
 @RunWith(JUnit4.class)
 public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportChannelTest {
+  private static final String DEFAULT_ENDPOINT = "test.googleapis.com:443";
   private String originalOSNameSystemProperty;
   private EnvironmentProvider envProvider;
   private ComputeEngineCredentials computeEngineCredentials;
@@ -335,7 +336,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
         InstantiatingGrpcChannelProvider.newBuilder()
             .setAttemptDirectPath(true)
             .setAttemptDirectPathXds()
-            .setEndpoint("test.googleapis.com:443")
+            .setEndpoint(DEFAULT_ENDPOINT)
             .build();
     assertThat(provider.canUseDirectPathWithUniverseDomain()).isTrue();
   }
@@ -357,7 +358,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
         InstantiatingGrpcChannelProvider.newBuilder()
             .setAttemptDirectPath(true)
             .setAttemptDirectPathXds()
-            .setEndpoint("test.googleapis.com:443")
+            .setEndpoint(DEFAULT_ENDPOINT)
             .build();
 
     assertThat(provider.isDirectPathXdsEnabled()).isTrue();
@@ -622,7 +623,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
             .setAttemptDirectPath(true)
             .setHeaderProvider(Mockito.mock(HeaderProvider.class))
             .setExecutor(Mockito.mock(Executor.class))
-            .setEndpoint("test.googleapis.com:443")
+            .setEndpoint(DEFAULT_ENDPOINT)
             .build();
 
     TransportChannel transportChannel = provider.getTransportChannel();
@@ -648,7 +649,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
             .setAllowNonDefaultServiceAccount(true)
             .setHeaderProvider(Mockito.mock(HeaderProvider.class))
             .setExecutor(Mockito.mock(Executor.class))
-            .setEndpoint("test.googleapis.com:443")
+            .setEndpoint(DEFAULT_ENDPOINT)
             .build();
 
     TransportChannel transportChannel = provider.getTransportChannel();
@@ -672,7 +673,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
             .setAttemptDirectPath(true)
             .setCredentials(computeEngineCredentials)
             .setSystemProductNameReader(systemProductNameReader)
-            .setEndpoint("test.googleapis.com:443")
+            .setEndpoint(DEFAULT_ENDPOINT)
             .build();
     Truth.assertThat(provider.canUseDirectPath()).isTrue();
   }
@@ -690,7 +691,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
             .setAttemptDirectPath(true)
             .setCredentials(computeEngineCredentials)
             .setSystemProductNameReader(systemProductNameReader)
-            .setEndpoint("test.googleapis.com:443")
+            .setEndpoint(DEFAULT_ENDPOINT)
             .build();
     Truth.assertThat(provider.canUseDirectPath()).isFalse();
   }
@@ -698,6 +699,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
   @Test
   public void canUseDirectPath_directPathEnvVarNotSet_attemptDirectPathIsTrue() {
     EnvironmentProvider envProvider = Mockito.mock(EnvironmentProvider.class);
+    // If system property is not set, then System.getProperty() returns null
     Mockito.when(
             envProvider.getenv(
                 InstantiatingGrpcChannelProvider.DIRECT_PATH_ENV_DISABLE_DIRECT_PATH))
@@ -708,7 +710,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
             .setAttemptDirectPath(true)
             .setCredentials(computeEngineCredentials)
             .setSystemProductNameReader(systemProductNameReader)
-            .setEndpoint("test.googleapis.com:443")
+            .setEndpoint(DEFAULT_ENDPOINT)
             .build();
     Truth.assertThat(provider.canUseDirectPath()).isTrue();
   }
@@ -726,7 +728,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
             .setAttemptDirectPath(false)
             .setCredentials(computeEngineCredentials)
             .setSystemProductNameReader(systemProductNameReader)
-            .setEndpoint("test.googleapis.com:443")
+            .setEndpoint(DEFAULT_ENDPOINT)
             .build();
     Truth.assertThat(provider.canUseDirectPath()).isFalse();
   }
@@ -740,7 +742,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
             .setAttemptDirectPath(true)
             .setCredentials(credentials)
             .setSystemProductNameReader(systemProductNameReader)
-            .setEndpoint("test.googleapis.com:443")
+            .setEndpoint(DEFAULT_ENDPOINT)
             .build();
     Truth.assertThat(provider.canUseDirectPath()).isFalse();
   }
@@ -756,7 +758,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
             .setAttemptDirectPath(true)
             .setCredentials(computeEngineCredentials)
             .setSystemProductNameReader(systemProductNameReader)
-            .setEndpoint("test.googleapis.com:443")
+            .setEndpoint(DEFAULT_ENDPOINT)
             .build();
     Truth.assertThat(provider.canUseDirectPath()).isFalse();
   }
@@ -771,7 +773,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
             .setAttemptDirectPath(true)
             .setCredentials(computeEngineCredentials)
             .setSystemProductNameReader(systemProductNameReader)
-            .setEndpoint("test.googleapis.com:443")
+            .setEndpoint(DEFAULT_ENDPOINT)
             .build();
     Truth.assertThat(provider.canUseDirectPath()).isFalse();
   }
@@ -787,7 +789,7 @@ public class InstantiatingGrpcChannelProviderTest extends AbstractMtlsTransportC
             .setAttemptDirectPath(true)
             .setCredentials(computeEngineCredentials)
             .setSystemProductNameReader(systemProductNameReader)
-            .setEndpoint("test.googleapis.com:443")
+            .setEndpoint(DEFAULT_ENDPOINT)
             .build();
     Truth.assertThat(provider.canUseDirectPath()).isFalse();
   }
